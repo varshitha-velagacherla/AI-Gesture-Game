@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gesture Catch - AI Hand-Controlled Game</title>
+    
+    <!-- Google Fonts: Outfit for premium typography -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+    
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="style.css">
+    
+    <!-- MediaPipe CDN scripts for Camera, Drawing, and Hands tracking -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+</head>
+<body>
+    <!-- Premium Dynamic Background Grid/Glow elements -->
+    <div class="bg-grid"></div>
+    <div class="bg-glow bg-cyan"></div>
+    <div class="bg-glow bg-purple"></div>
+
+    <div class="app-container">
+        <!-- Floating Header with AI Badge -->
+        <header class="app-header">
+            <div class="brand">
+                <span class="brand-dot"></span>
+                <span class="brand-title">GESTURE CATCH</span>
+            </div>
+            <!-- AI Badge -->
+            <div id="ai-badge" class="badge badge-disconnected">
+                <span class="badge-dot"></span>
+                <span id="badge-text" class="badge-text">Camera Inactive</span>
+            </div>
+        </header>
+
+        <!-- Main Game Area -->
+        <main class="game-container">
+            <!-- HUD (Heads Up Display) overlay -->
+            <div id="hud" class="hud-overlay hidden">
+                <div class="hud-item score-box">
+                    <span class="hud-label">SCORE</span>
+                    <span id="hud-score" class="hud-value">000</span>
+                </div>
+                <div class="hud-item level-box">
+                    <span class="hud-label">LEVEL</span>
+                    <span id="hud-level" class="hud-value">1</span>
+                </div>
+                <div class="hud-item health-box">
+                    <span class="hud-label">HEALTH</span>
+                    <div id="hud-health-hearts" class="hearts-container">
+                        <!-- Hearts will dynamically generate -->
+                        <span class="heart active">♥</span>
+                        <span class="heart active">♥</span>
+                        <span class="heart active">♥</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Main Canvas where the game is drawn -->
+            <div class="canvas-wrapper">
+                <!-- Screen shake element parent container -->
+                <div id="game-frame" class="game-frame">
+                    <canvas id="game-canvas" width="800" height="600"></canvas>
+                </div>
+
+                <!-- Screen 1: Start Screen Overlay -->
+                <div id="start-screen" class="screen-overlay">
+                    <h1 class="game-title">Gesture Catch</h1>
+                    <p class="game-subtitle">Control the game with your hand position in real-time.</p>
+                    
+                    <div class="instructions-card">
+                        <h3>HOW TO PLAY:</h3>
+                        <ul>
+                            <li>
+                                <div class="step-num">1</div>
+                                <span class="step-desc">Allow webcam permission to start hand tracking.</span>
+                            </li>
+                            <li>
+                                <div class="step-num">2</div>
+                                <span class="step-desc">Control the basket horizontally using your <strong>Index Finger</strong>.</span>
+                            </li>
+                            <li>
+                                <div class="step-num">3</div>
+                                <span class="step-desc"><span class="cyan-text">Pinch</span> (bring index and thumb together) to <strong>expand basket size</strong>.</span>
+                            </li>
+                            <li>
+                                <div class="step-num">4</div>
+                                <span class="step-desc"><span class="red-text">Close your hand</span> (fist) to <strong>pause the game</strong>. Open to resume.</span>
+                            </li>
+                            <li>
+                                <div class="step-num">5</div>
+                                <span class="step-desc">Catch <span class="cyan-text">cyan orbs (+10 pts)</span>. Avoid dangerous <span class="red-text">red orbs (-1 hp)</span>.</span>
+                            </li>
+                        </ul>
+                    </div>
+
+                    <div class="start-controls">
+                        <button id="start-btn" class="btn btn-primary">Start Game</button>
+                        <span class="fallback-note">Or press Space/Click to play with arrow keys fallback.</span>
+                    </div>
+                </div>
+
+                <!-- Screen 2: Game Over Screen Overlay -->
+                <div id="game-over-screen" class="screen-overlay hidden">
+                    <span class="game-over-label">GAME OVER</span>
+                    <h2 id="final-score-title" class="score-banner">Score: <span id="final-score">0</span></h2>
+                    <p class="time-elapsed">Time Survived: <span id="final-time">0s</span> | Max Level: <span id="final-level">1</span></p>
+                    
+                    <button id="restart-btn" class="btn btn-secondary">Play Again</button>
+                </div>
+
+                <!-- Screen 3: Pause Screen Overlay -->
+                <div id="pause-screen" class="screen-overlay hidden">
+                    <span class="pause-label">GAME PAUSED</span>
+                    <p class="pause-subtitle">Open your hand to resume</p>
+                    <p class="pause-keyboard-hint">Or click Resume / press Esc/P</p>
+                    <button id="resume-btn" class="btn btn-primary" style="margin-top: 25px;">Resume Game</button>
+                </div>
+
+                <!-- Input Notification banner -->
+                <div id="status-banner" class="status-banner hidden">
+                    <p id="status-message">Show your hand to start</p>
+                </div>
+            </div>
+
+            <!-- Floating Sidebar Container for Webcam Stream -->
+            <div id="camera-container" class="camera-container">
+                <div class="camera-title-bar">
+                    <span class="camera-pulse"></span>
+                    <span class="camera-title-text">AI FEED</span>
+                </div>
+                <div class="video-wrapper">
+                    <!-- Mirrored webcam video (hidden container, but active source) -> standard mirror in css -->
+                    <video id="webcam-video" autoplay playsinline></video>
+                    <!-- Mirrored canvas for landmarks skeleton overlay -->
+                    <canvas id="webcam-canvas"></canvas>
+                    
+                    <!-- Preloading spinner or warning -->
+                    <div id="camera-placeholder" class="camera-placeholder">
+                        <div class="spinner"></div>
+                        <span id="camera-placeholder-text">Initializing AI Model...</span>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Footer / Keyboard Fallback Notice -->
+        <footer class="app-footer">
+            <span class="footer-control-info">
+                Mode: <span id="input-mode-badge" class="mode-text">Detecting webcam...</span>
+            </span>
+            <div id="keyboard-hint" class="keyboard-hint">
+                <kbd>←</kbd> <kbd>→</kbd> keys can be used to control the basket manually.
+            </div>
+        </footer>
+    </div>
+
+    <!-- Main Game Script -->
+    <script src="script.js"></script>
+</body>
+</html>
